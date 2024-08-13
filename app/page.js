@@ -17,16 +17,34 @@ export default function Chat() {
   const receiverId = searchParams.get('receiverId');
 
   const scrollToBottom = () => {
-    if (chatBoxRef.current) {
-      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
-    }
+    chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+  };
+  const scrollToTop = () => {
+    chatBoxRef.current.scrollToBottom = chatBoxRef.current.scrollHeight;
   };
 
   useEffect(() => {
+    // console.log(chatBoxRef.current.scrollTop);
+    // console.log(chatBoxRef.current.scrollToBottom);
+    // if(chatBoxRef.current.scrollTop==0){
+    //   scrollToTop();
+    // }
+    if(chatBoxRef.current.scrollTop>0){
+      // scrollToBottom();
+      scrollToTop();
+
+    }
+    if(chatBoxRef.current.scrollToBottom<0){
+      // scrollToTop();
+      scrollToBottom();
+
+    }
+
     const fetchMessages = async () => {
       try {
         const response = await databases.listDocuments(databaseId, collectionId);
         setMessages(response.documents);
+        scrollToBottom();
       } catch (error) {
         console.error('Error fetching messages:', error);
       }
@@ -45,9 +63,11 @@ export default function Chat() {
     };
   }, [messages]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // useEffect(() => {
+  //   scrollToBottom();
+  //   // scrollToTop();
+
+  // }, [messages]);
 
   const sendMessage = async () => {
     if (!senderId || !receiverId) {
@@ -72,10 +92,10 @@ export default function Chat() {
 
   return (
     <div className="container mt-5">
-      <h1 className="text-center mb-4">Real-Time Chat</h1>
+      {/* <h1 className="text-center mb-4">Real-Time Chat</h1> */}
 
       <div className="card">
-        <div className="card-body chat-box" ref={chatBoxRef} style={{height: '400px', overflowY: 'auto'}}>
+        <div className="card-body chat-box" ref={chatBoxRef} style={{height: '600px', overflowY: 'auto'}}>
           {messages.map((msg) => (
             <div key={msg.$id || msg.timestamp} className={`mb-3 ${msg.senderId === senderId ? 'text-end' : ''}`}>
               <div className={`d-inline-block p-2 rounded ${msg.senderId === senderId ? 'bg-primary text-white' : 'bg-light'}`}>
