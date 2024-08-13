@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { client, databases } from './appwrite';
+import { useSearchParams } from 'next/navigation';
 
 const databaseId = 'messages';  // Your database ID
 const collectionId = 'msg'; // Your collection ID
@@ -9,9 +10,19 @@ const collectionId = 'msg'; // Your collection ID
 export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const chatBoxRef = useRef(null);
+
+  const searchParams = useSearchParams();
+  const senderId = searchParams.get('senderId');
+  const receiverId = searchParams.get('receiverId');
+
+  const scrollToBottom = () => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  };
 
   useEffect(() => {
-    // Fetch existing messages
     const fetchMessages = async () => {
       try {
         const response = await databases.listDocuments(databaseId, collectionId);
@@ -23,7 +34,6 @@ export default function Chat() {
 
     fetchMessages();
 
-    // Subscribe to real-time updates
     const unsubscribe = client.subscribe(`databases.${databaseId}.collections.${collectionId}.documents`, response => {
       if (response.events.includes('databases.*.collections.*.documents.*.create')) {
         setMessages(prevMessages => [...prevMessages, response.payload]);
@@ -33,16 +43,27 @@ export default function Chat() {
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [messages]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const sendMessage = async () => {
+    if (!senderId || !receiverId) {
+      alert('Both sender and receiver must be specified.');
+      return;
+    }
+
     try {
-      await databases.createDocument(databaseId, collectionId, 'unique()', {
-        senderId: 'user1',  // Replace with dynamic user IDs
-        receiverId: 'user2',  // Replace with dynamic user IDs
+      const documentData = {
+        senderId: senderId,
+        receiverId: receiverId,
         message: newMessage,
         timestamp: new Date().toISOString(),
-      });
+      };
+
+      await databases.createDocument(databaseId, collectionId, 'unique()', documentData);
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -50,21 +71,33 @@ export default function Chat() {
   };
 
   return (
-    <div>
-      <h1>Real-Time Chat</h1>
-      <div>
-        {messages.map((msg) => (
-          <div key={msg.$id}>
-            <p><strong>{msg.senderId}</strong>: {msg.message} <em>{new Date(msg.timestamp).toLocaleTimeString()}</em></p>
+    <div className="container mt-5">
+      <h1 className="text-center mb-4">Real-Time Chat</h1>
+
+      <div className="card">
+        <div className="card-body chat-box" ref={chatBoxRef} style={{height: '400px', overflowY: 'auto'}}>
+          {messages.map((msg) => (
+            <div key={msg.$id || msg.timestamp} className={`mb-3 ${msg.senderId === senderId ? 'text-end' : ''}`}>
+              <div className={`d-inline-block p-2 rounded ${msg.senderId === senderId ? 'bg-primary text-white' : 'bg-light'}`}>
+                <p className="mb-0">{msg.message}</p>
+                <small className="text-muted">{new Date(msg.timestamp).toLocaleTimeString()}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="card-footer">
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message..."
+            />
+            <button className="btn btn-primary" onClick={sendMessage} disabled={!newMessage.trim()}>Send</button>
           </div>
-        ))}
+        </div>
       </div>
-      <input
-        type="text"
-        value={newMessage}
-        onChange={(e) => setNewMessage(e.target.value)}
-      />
-      <button onClick={sendMessage}>Send</button>
     </div>
   );
 }
